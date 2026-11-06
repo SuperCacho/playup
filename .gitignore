@@ -1,0 +1,21 @@
+# entorno virtuales
+.venv/
+venv/
+
+#variables de entorno (NUNCA SUBIR CONTRASEÑAS)
+.env
+*.env
+
+#archivos de python
+__pycache__/
+*.pyc
+*.pyo
+
+# cosas de IDEs
+.vscode/
+.idea/
+
+# sistema operativo
+.DS_Store
+Thumbs.db
+
