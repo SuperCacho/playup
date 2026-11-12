@@ -4,9 +4,21 @@ import uuid
 import requests
 import schemas
 from database import supabase
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 router = APIRouter(prefix="/api/juegos", tags=["Juegos"])
+
+
+def obtener_usuario_actual(authorization: str | None = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No autorizado: Falta el token")
+    try:
+        token = authorization.replace("Bearer ", "")
+        user = supabase.auth.get_user(token)
+        return user.user.id
+    except Exception as e:
+        print(f" ERROR TOKEN: {e!s}")
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
 
 @router.get("/catalogos")
@@ -42,12 +54,13 @@ def buscar_imagen_steam(titulo: str):
 
 
 @router.get("/", response_model=list[schemas.JuegoResponse])
-def obtener_juegos():
+def obtener_juegos(usuario_id: str = Depends(obtener_usuario_actual)):
     try:
         response = (
             supabase.table("juegos")
             .select("*, juegos_generos(generos(*))")
             .eq("activo", True)
+            .eq("usuario_id", usuario_id)
             .execute()
         )
         juegos_limpios = []
@@ -57,15 +70,19 @@ def obtener_juegos():
             juegos_limpios.append(j)
         return juegos_limpios
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f" ERROR BD: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener juegos: {e!s}")
 
 
 @router.post("/", response_model=schemas.JuegoResponse)
-def crear_juego(juego: schemas.JuegoCreate):
+def crear_juego(
+    juego: schemas.JuegoCreate, usuario_id: str = Depends(obtener_usuario_actual)
+):
     datos = juego.model_dump()
     generos_ids = datos.pop("generos", [])
     datos["id"] = str(uuid.uuid4())
     datos["activo"] = True
+    datos["usuario_id"] = usuario_id
     try:
         response = supabase.table("juegos").insert(datos).execute()
         nuevo_juego = response.data[0]
@@ -89,13 +106,25 @@ def crear_juego(juego: schemas.JuegoCreate):
 
 
 @router.put("/{juego_id}", response_model=schemas.JuegoResponse)
-def actualizar_juego(juego_id: str, juego_actualizado: schemas.JuegoCreate):
+def actualizar_juego(
+    juego_id: str,
+    juego_actualizado: schemas.JuegoCreate,
+    usuario_id: str = Depends(obtener_usuario_actual),
+):
     datos = juego_actualizado.model_dump()
     generos_ids = datos.pop("generos", [])
     try:
-        response = supabase.table("juegos").update(datos).eq("id", juego_id).execute()
+        response = (
+            supabase.table("juegos")
+            .update(datos)
+            .eq("id", juego_id)
+            .eq("usuario_id", usuario_id)
+            .execute()
+        )
         if not response.data:
-            raise HTTPException(status_code=404, detail="Juego no encontrado")
+            raise HTTPException(
+                status_code=404, detail="Juego no encontrado o no tenés permiso"
+            )
 
         supabase.table("juegos_generos").delete().eq("juego_id", juego_id).execute()
         if generos_ids:
@@ -118,16 +147,19 @@ def actualizar_juego(juego_id: str, juego_actualizado: schemas.JuegoCreate):
 
 
 @router.delete("/{juego_id}")
-def eliminar_juego(juego_id: str):
+def eliminar_juego(juego_id: str, usuario_id: str = Depends(obtener_usuario_actual)):
     try:
         response = (
             supabase.table("juegos")
             .update({"activo": False})
             .eq("id", juego_id)
+            .eq("usuario_id", usuario_id)
             .execute()
         )
         if not response.data:
-            raise HTTPException(status_code=404, detail="Juego no encontrado")
+            raise HTTPException(
+                status_code=404, detail="Juego no encontrado o no tenés permiso"
+            )
         return {"mensaje": "Juego eliminado correctamente"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al eliminar: {e!s}")

@@ -23,9 +23,12 @@
 
             <div class="checkbox-group">
               <input type="checkbox" id="recordarme" v-model="recordarme" />
-              <label for="recordarme">Mantener sesión</label>
+              <label for="recordarme">Mantener sesión iniciada</label>
             </div>
-            <button type="submit" class="btn-primary">{{ esRegistro ? 'Registrarse' : 'Entrar' }}</button>
+            <button type="submit" class="btn-primary" :disabled="cargandoAuth">
+              <span v-if="cargandoAuth" class="spinner"></span>
+              <span v-else>{{ esRegistro ? 'Registrarse' : 'Entrar' }}</span>
+            </button>
           </form>
           <p @click="esRegistro = !esRegistro" class="toggle-auth">{{ esRegistro ? '¿Ya tenés cuenta? Iniciá sesión' : '¿No tenés cuenta? Registrate' }}</p>
         </div>
@@ -43,11 +46,17 @@ import Sidebar from './components/Sidebar.vue'
 const logueado = ref(false)
 const esAdmin = ref(false)
 const esRegistro = ref(false)
-const recordarme = ref(true)
+const recordarme = ref(false)
 const mostrarPassword = ref(false)
+const cargandoAuth = ref(false)
 const credenciales = ref({ email: '', password: '' })
 
+const configurarAxios = (token) => {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+}
+
 const manejarAuth = async () => {
+  cargandoAuth.value = true
   const endpoint = esRegistro.value ? '/api/auth/register' : '/api/auth/login'
   try {
     const res = await axios.post(`http://127.0.0.1:8000${endpoint}`, credenciales.value)
@@ -55,22 +64,24 @@ const manejarAuth = async () => {
       alert("¡Registrado con éxito! Ahora podés iniciar sesión.")
       esRegistro.value = false
     } else {
-      // Guardamos el token y el rol
       const storage = recordarme.value ? localStorage : sessionStorage
       storage.setItem('token', res.data.token)
       storage.setItem('rol', res.data.rol)
-      
+      configurarAxios(res.data.token)
       logueado.value = true
       esAdmin.value = res.data.rol === 'admin'
     }
   } catch (error) {
     alert(error.response?.data?.detail || "Error en la autenticación")
+  } finally {
+    cargandoAuth.value = false
   }
 }
 
 const cerrarSesion = () => {
   localStorage.removeItem('token'); localStorage.removeItem('rol');
   sessionStorage.removeItem('token'); sessionStorage.removeItem('rol');
+  delete axios.defaults.headers.common['Authorization']
   logueado.value = false
   esAdmin.value = false
 }
@@ -79,6 +90,7 @@ onMounted(() => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token')
   const rol = localStorage.getItem('rol') || sessionStorage.getItem('rol')
   if (token) {
+    configurarAxios(token)
     logueado.value = true
     esAdmin.value = rol === 'admin'
   }
@@ -86,9 +98,21 @@ onMounted(() => {
 </script>
 
 <style>
+/* ACÁ ESTÁ LA MAGIA QUE SE HABÍA PERDIDO */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-:root { --fondo-principal: #0f172a; --fondo-tarjeta: rgba(30, 41, 59, 0.7); --azul-principal: #38BDF8; --texto-principal: #F8FAFC; --texto-secundario: #94A3B8; --borde: rgba(51, 65, 85, 0.5); --rojo: #F87171; --verde: #4ADE80; --amarillo: #FBBF24; }
+:root { 
+  --fondo-principal: #0f172a; 
+  --fondo-tarjeta: rgba(30, 41, 59, 0.7); 
+  --azul-principal: #38BDF8; 
+  --texto-principal: #F8FAFC; 
+  --texto-secundario: #94A3B8; 
+  --borde: rgba(51, 65, 85, 0.5); 
+  --rojo: #F87171; 
+  --verde: #4ADE80; 
+  --amarillo: #FBBF24; 
+}
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+body { background-color: var(--fondo-principal); color: var(--texto-principal); }
 .fondo-animado { min-height: 100vh; background: linear-gradient(-45deg, #0f172a, #1e1b4b, #0f172a, #1e293b); background-size: 400% 400%; animation: gradientBG 15s ease infinite; color: var(--texto-principal); }
 @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 .layout { display: flex; }
@@ -102,27 +126,20 @@ onMounted(() => {
 .login-box form { display: flex; flex-direction: column; gap: 1.2rem; }
 .input-group { display: flex; flex-direction: column; text-align: left; gap: 0.5rem; }
 .input-group label { font-size: 0.85rem; color: var(--texto-secundario); font-weight: 600; }
-
-/* Arregla el fondo del input de email y contraseña */
-.input-group > input, .password-wrapper input { 
-  padding: 0.8rem; border-radius: 8px; border: 1px solid var(--borde); 
-  background: rgba(15, 23, 42, 0.6) !important; color: white !important; 
-  outline: none; transition: 0.3s; width: 100%; 
-}
-.input-group > input:focus, .password-wrapper input:focus { 
-  border-color: var(--azul-principal) !important; 
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); 
-}
-
+.input-group > input, .password-wrapper input { padding: 0.8rem; border-radius: 8px; border: 1px solid var(--borde); background: rgba(15, 23, 42, 0.6) !important; color: white !important; outline: none; transition: 0.3s; width: 100%; }
+.input-group > input:focus, .password-wrapper input:focus { border-color: var(--azul-principal) !important; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
 .password-wrapper { position: relative; display: flex; align-items: center; }
 .password-wrapper i { position: absolute; right: 10px; color: var(--texto-secundario); cursor: pointer; transition: 0.2s; }
 .password-wrapper i:hover { color: var(--azul-principal); }
-
 .checkbox-group { display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; font-size: 0.85rem; color: var(--texto-secundario); }
 .checkbox-group input { width: auto; }
-.btn-primary { padding: 0.8rem; border-radius: 8px; border: none; background: var(--azul-principal); color: #000; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); }
+.btn-primary { padding: 0.8rem; border-radius: 8px; border: none; background: var(--azul-principal); color: #000; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; display: flex; justify-content: center; align-items: center; height: 48px;}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); }
+.btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
 .toggle-auth { color: var(--azul-principal); cursor: pointer; margin-top: 1.5rem; font-size: 0.9rem; transition: 0.3s; }
 .toggle-auth:hover { color: white; }
-@media (max-width: 768px) { .con-sidebar { margin-left: 0; padding-bottom: 80px; } }
+.spinner { width: 20px; height: 20px; border: 3px solid rgba(0, 0, 0, 0.3); border-top-color: #000; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) { .con-sidebar { margin-left: 0; padding: 4rem 1rem 2rem 1rem; } }
 </style>

@@ -12,6 +12,7 @@ class JuegoBase(BaseModel):
     categoria_id: int | None = None
     opinion_id: int | None = None
     portada_url: str | None = None
+    usuario_id: str | None = None
 
 
 class JuegoCreate(JuegoBase):

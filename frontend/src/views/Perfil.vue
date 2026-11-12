@@ -32,7 +32,7 @@
       </div>
       <div class="progreso-container" v-else>
         <p class="falta-texto" style="color: var(--amarillo); font-weight: bold; font-size: 1.1rem;">
-          ¡Has alcanzado el rango máximo! 🏆
+          ¡Has alcanzado el rango máximo! <i class="fa-solid fa-trophy"></i>
         </p>
       </div>
 
@@ -76,9 +76,7 @@ const RANGOS = [
 const rangoActual = computed(() => {
   let actual = { id: 0, nombre: 'Sin Rango', color: '#94A3B8', horas: 0, juegos: 0 }
   for (let r of RANGOS) {
-    if (totalHoras.value >= r.horas && totalJuegos.value >= r.juegos) {
-      actual = r
-    }
+    if (totalHoras.value >= r.horas && totalJuegos.value >= r.juegos) { actual = r }
   }
   return actual
 })
@@ -91,7 +89,6 @@ const siguienteRango = computed(() => {
 const porcentajeProgreso = computed(() => {
   if (rangoActual.value.id === 10) return 100
   if (rangoActual.value.id === 0) return 0
-  
   const ptsActual = totalHoras.value - rangoActual.value.horas
   const ptsNecesarios = siguienteRango.value.horas - rangoActual.value.horas
   return Math.min(Math.round((ptsActual / ptsNecesarios) * 100), 100)
@@ -102,29 +99,20 @@ const porcentajeProgreso = computed(() => {
 .titulo-pagina { color: var(--azul-principal); margin-bottom: 2rem; font-weight: 800; }
 .perfil-container { max-width: 600px; margin: 0 auto; }
 .perfil-card { padding: 3rem 2rem; border-radius: 16px; text-align: center; }
-
 .avatar-container { width: 120px; height: 120px; margin: 0 auto 1rem auto; border-radius: 50%; background: var(--fondo-principal); display: flex; justify-content: center; align-items: center; border: 3px solid; overflow: hidden; transition: 0.5s; }
 .avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .avatar-icon { font-size: 4rem; transition: 0.5s; }
-
 h2 { margin: 0; color: white; font-size: 1.5rem; }
 .rango-nombre { font-size: 1.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-top: 0.5rem; transition: 0.5s; }
-
 .perfil-stats { display: flex; justify-content: center; gap: 3rem; margin: 2rem 0; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); padding: 1.5rem 0; }
 .stat { display: flex; flex-direction: column; }
 .stat-valor { font-size: 1.5rem; font-weight: 800; color: white; }
 .stat-nombre { font-size: 0.8rem; color: var(--texto-secundario); text-transform: uppercase; }
-
 .progreso-container { text-align: left; margin-bottom: 2rem; }
 .progreso-texto { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--texto-secundario); margin-bottom: 0.5rem; font-weight: 600; }
 .barra-fondo { background: var(--fondo-principal); height: 12px; border-radius: 6px; overflow: hidden; }
 .barra-progreso { height: 100%; border-radius: 6px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), background 0.5s; }
 .falta-texto { font-size: 0.9rem; color: var(--texto-secundario); margin-top: 0.8rem; text-align: center; }
-
 .cambiar-foto input { width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--borde); background: rgba(15, 23, 42, 0.6); color: white; text-align: center; }
-
-@media (max-width: 600px) {
-  .perfil-stats { flex-direction: column; gap: 1rem; }
-  .stat { flex-direction: row; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;}
-}
+@media (max-width: 600px) { .perfil-stats { flex-direction: column; gap: 1rem; } .stat { flex-direction: row; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;} }
 </style>
