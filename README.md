@@ -1,31 +1,27 @@
-#  Play Up
+#  Play Up (v2.0)
 
-**Play Up** es una aplicación web desarrollada como Proyecto Integrador para la materia Programación II. Surge de la necesidad de reemplazar una planilla de Excel utilizada para registrar, organizar y consultar una colección personal de videojuegos.
+**Play Up** es una aplicación web integral desarrollada como Proyecto Integrador para la materia Programación II. Reemplaza el uso de planillas de cálculo para gestionar una biblioteca personal de videojuegos.
 
 ##  Tecnologías Utilizadas
+*   **Frontend:** Vue 3 (Composition API), Vue Router, Vite, Axios, Font Awesome.
+*   **Backend:** Python 3, FastAPI, Uvicorn, Pydantic, Supabase SDK.
+*   **Base de Datos:** PostgreSQL (Supabase).
 
-*   **Frontend:** Vue 3 (Composition API), Vite, Axios, Font Awesome.
-*   **Backend:** Python 3, FastAPI, Uvicorn, Pydantic.
-*   **Base de Datos:** PostgreSQL (alojado en Supabase).
-*   **Control de Versiones:** Git y GitHub.
+##  Características Principales (Nuevas)
+*   **Autenticación:** Sistema de Login y Registro conectado a Supabase Auth.
+*   **Enrutamiento (SPA):** Navegación fluida entre Dashboard, Biblioteca y Perfil sin recargar la página (Vue Router).
+*   **Relaciones N:M:** Los juegos se vinculan con múltiples géneros a través de una tabla pivote (`juegos_generos`).
+*   **Dashboard Estadístico:** Gráficos dinámicos de distribución por Estado y Top Géneros, calculados en tiempo real.
+*   **Perfil Gamer:** Rangos dinámicos (Novato, Veterano, Élite) calculados según la cantidad de juegos y horas jugadas. Permite personalizar el avatar.
+*   **Formularios Dinámicos:** Los estados y géneros se cargan desde la base de datos real (no están hardcodeados).
 
-##  Arquitectura
+##  Instalación y Ejecución
 
-El proyecto sigue una arquitectura de 3 capas:
-1.  **Frontend (Vue):** Interfaz de usuario. Se comunica con el backend mediante peticiones HTTP (API REST).
-2.  **Backend (FastAPI):** Lógica de negocio y validación de datos (Pydantic). Se conecta a la base de datos usando el SDK oficial de Supabase para Python.
-3.  **Base de Datos (Supabase):** Almacena la información de manera relacional. Incluye una tabla principal (`juegos`) y tablas satélite (`estados`, `categorias`, `opiniones`, `generos`).
-
-*Nota:* Se implementó **baja lógica** para la eliminación de registros (el campo `activo` pasa a `False` en lugar de borrar la fila físicamente).
-
-## 🛠️ Instalación y Ejecución (Para Desarrolladores)
-
-### Requisitos previos
-*   Python 3.10 o superior.
-*   Node.js (para el frontend).
-*   Una cuenta en Supabase y un proyecto creado.
-
-### 1. Clonar el repositorio
+### 1. Backend (Python)
 ```bash
-git clone https://github.com/SuperCacho/playup.git
-cd playup
+cd backend
+python -m venv .venv
+source .venv/Scripts/activate  # Windows
+pip install -r requirements.txt
+# Crear archivo .env con SUPABASE_URL y SUPABASE_KEY
+uvicorn main:app --reload
