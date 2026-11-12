@@ -1,264 +1,128 @@
 <template>
-  <div class="app-container">
-    <header>
-      <h1><i class="fa-solid fa-gamepad"></i> PLAY UP</h1>
-      <p>Tu biblioteca personal de videojuegos</p>
-    </header>
-
-    <main>
-      <!-- Formulario (Agregar / Editar) -->
-      <section class="form-section">
-        <h2>{{ idEdicion ? 'Editar Juego' : 'Agregar Juego' }}</h2>
-        <form @submit.prevent="guardarJuego">
-          <input v-model="nuevoJuego.titulo" placeholder="Título del juego" required />
-          <input v-model.number="nuevoJuego.puntuacion" type="number" step="0.1" min="1" max="10" placeholder="Puntuación (1-10)" />
-          <input v-model.number="nuevoJuego.duracion_horas" type="number" step="0.5" placeholder="Horas jugadas" />
-          <input v-model="nuevoJuego.notas" placeholder="Notas (opcional)" />
+  <div class="layout fondo-animado">
+    <Sidebar v-if="logueado" @logout="cerrarSesion" :esAdmin="esAdmin" />
+    <main :class="['main-content', { 'con-sidebar': logueado }]">
+      <div v-if="!logueado" class="login-container">
+        <div class="login-box glass-panel">
+          <h1 class="logo-login"><i class="fa-solid fa-gamepad"></i> PLAY UP</h1>
+          <h2>{{ esRegistro ? 'Crear Cuenta' : 'Iniciar Sesión' }}</h2>
           
-          <select v-model.number="nuevoJuego.estado_id" required>
-            <option :value="null" disabled>Seleccioná un estado</option>
-            <option :value="1">En curso</option>
-            <option :value="2">Terminado</option>
-            <option :value="3">Pendiente</option>
-            <option :value="4">Abandonado</option>
-          </select>
-
-          <button type="submit" :class="{ 'btn-editar': idEdicion }">
-            {{ idEdicion ? 'Guardar Cambios' : 'Agregar a la Biblioteca' }}
-          </button>
-          
-          <button v-if="idEdicion" type="button" @click="cancelarEdicion" class="btn-cancelar">
-            Cancelar
-          </button>
-        </form>
-      </section>
-
-      <!-- Buscador y Grilla -->
-      <section class="biblioteca">
-        <div class="header-biblioteca">
-          <h2>Mi Biblioteca ({{ juegosFiltrados.length }})</h2>
-          <input v-model="busqueda" type="search" placeholder="🔍 Buscar juego..." class="buscador" />
-        </div>
-
-        <!-- Reporte de métricas -->
-        <div class="reporte-metricas">
-          <div class="metrica">
-            <span class="metrica-titulo">Total</span>
-            <span class="metrica-valor">{{ totalJuegos }}</span>
-          </div>
-          <div class="metrica">
-            <span class="metrica-titulo">Promedio</span>
-            <span class="metrica-valor">⭐ {{ promedioPuntuacion }}</span>
-          </div>
-          <div class="metrica">
-            <span class="metrica-titulo">Horas Jugadas</span>
-            <span class="metrica-valor">⏱️ {{ totalHoras }}h</span>
-          </div>
-        </div>
-
-        <div v-if="cargando">Cargando juegos...</div>
-        <div v-else-if="juegosFiltrados.length === 0" class="vacio">
-          No se encontraron juegos.
-        </div>
-
-        <div v-else class="grid-juegos">
-          <div v-for="juego in juegosFiltrados" :key="juego.id" class="card-juego">
-            <h3>{{ juego.titulo }}</h3>
-            <div class="card-info">
-              <span><i class="fa-solid fa-star" style="color: #FBBF24;"></i> {{ juego.puntuacion || 'S/N' }}</span>
-              <span><i class="fa-solid fa-clock" style="color: #94A3B8;"></i> {{ juego.duracion_horas || 0 }}h</span>
+          <form @submit.prevent="manejarAuth">
+            <div class="input-group">
+              <label>Email</label>
+              <input v-model="credenciales.email" type="email" required />
             </div>
-            <p class="notas">{{ juego.notas || 'Sin notas' }}</p>
             
-            <div class="card-acciones">
-              <button @click="prepararEdicion(juego)" class="btn-editar-card">
-                <i class="fa-solid fa-pen"></i> Editar
-              </button>
-              <button @click="eliminarJuego(juego.id)" class="btn-borrar">
-                <i class="fa-solid fa-trash"></i>
-              </button>
+            <div class="input-group">
+              <label>Contraseña</label>
+              <div class="password-wrapper">
+                <input v-model="credenciales.password" :type="mostrarPassword ? 'text' : 'password'" required />
+                <i class="fa-solid" :class="mostrarPassword ? 'fa-eye-slash' : 'fa-eye'" @click="mostrarPassword = !mostrarPassword"></i>
+              </div>
             </div>
-          </div>
+
+            <div class="checkbox-group">
+              <input type="checkbox" id="recordarme" v-model="recordarme" />
+              <label for="recordarme">Mantener sesión</label>
+            </div>
+            <button type="submit" class="btn-primary">{{ esRegistro ? 'Registrarse' : 'Entrar' }}</button>
+          </form>
+          <p @click="esRegistro = !esRegistro" class="toggle-auth">{{ esRegistro ? '¿Ya tenés cuenta? Iniciá sesión' : '¿No tenés cuenta? Registrate' }}</p>
         </div>
-      </section>
+      </div>
+      <router-view v-else></router-view>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import Sidebar from './components/Sidebar.vue'
 
-const API_URL = 'http://127.0.0.1:8000/api/juegos'
+const logueado = ref(false)
+const esAdmin = ref(false)
+const esRegistro = ref(false)
+const recordarme = ref(true)
+const mostrarPassword = ref(false)
+const credenciales = ref({ email: '', password: '' })
 
-const juegos = ref([])
-const cargando = ref(true)
-const busqueda = ref('')
-const idEdicion = ref(null)
-
-const juegoVacio = {
-  titulo: '',
-  puntuacion: null,
-  duracion_horas: null,
-  notas: '',
-  estado_id: null
-}
-
-const nuevoJuego = ref({ ...juegoVacio })
-
-// --- CARGAR DATOS ---
-const cargarJuegos = async () => {
+const manejarAuth = async () => {
+  const endpoint = esRegistro.value ? '/api/auth/register' : '/api/auth/login'
   try {
-    cargando.value = true
-    const respuesta = await axios.get(API_URL)
-    juegos.value = respuesta.data
-  } catch (error) {
-    console.error("Error al cargar juegos:", error)
-  } finally {
-    cargando.value = false
-  }
-}
-
-// --- GUARDAR (CREAR O EDITAR) ---
-const guardarJuego = async () => {
-  try {
-    if (idEdicion.value) {
-      // Si hay ID, es una edición (PUT)
-      await axios.put(`${API_URL}/${idEdicion.value}`, nuevoJuego.value)
+    const res = await axios.post(`http://127.0.0.1:8000${endpoint}`, credenciales.value)
+    if (esRegistro.value) {
+      alert("¡Registrado con éxito! Ahora podés iniciar sesión.")
+      esRegistro.value = false
     } else {
-      // Si no, es un juego nuevo (POST)
-      await axios.post(API_URL, nuevoJuego.value)
+      // Guardamos el token y el rol
+      const storage = recordarme.value ? localStorage : sessionStorage
+      storage.setItem('token', res.data.token)
+      storage.setItem('rol', res.data.rol)
+      
+      logueado.value = true
+      esAdmin.value = res.data.rol === 'admin'
     }
-    limpiarFormulario()
-    await cargarJuegos()
   } catch (error) {
-    console.error("Error al guardar:", error)
-    alert("Hubo un error al guardar el juego")
+    alert(error.response?.data?.detail || "Error en la autenticación")
   }
 }
 
-// --- PREPARAR EDICIÓN ---
-const prepararEdicion = (juego) => {
-  idEdicion.value = juego.id
-  nuevoJuego.value = {
-    titulo: juego.titulo,
-    puntuacion: juego.puntuacion,
-    duracion_horas: juego.duracion_horas,
-    notas: juego.notas,
-    estado_id: juego.estado_id
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' }) // Sube al form
+const cerrarSesion = () => {
+  localStorage.removeItem('token'); localStorage.removeItem('rol');
+  sessionStorage.removeItem('token'); sessionStorage.removeItem('rol');
+  logueado.value = false
+  esAdmin.value = false
 }
-
-const cancelarEdicion = () => {
-  limpiarFormulario()
-}
-
-const limpiarFormulario = () => {
-  idEdicion.value = null
-  nuevoJuego.value = { ...juegoVacio }
-}
-
-// --- ELIMINAR ---
-const eliminarJuego = async (id) => {
-  if (!confirm('¿Seguro que querés eliminar este juego?')) return
-  try {
-    await axios.delete(`${API_URL}/${id}`)
-    await cargarJuegos()
-  } catch (error) {
-    console.error("Error al eliminar:", error)
-  }
-}
-
-// --- BUSCADOR Y MÉTRICAS ---
-const juegosFiltrados = computed(() => {
-  const termino = busqueda.value.toLowerCase()
-  return juegos.value.filter(j => j.titulo.toLowerCase().includes(termino))
-})
-
-const totalJuegos = computed(() => juegos.value.length)
-
-const promedioPuntuacion = computed(() => {
-  const conPuntuacion = juegos.value.filter(j => j.puntuacion !== null)
-  if (conPuntuacion.length === 0) return 0
-  const suma = conPuntuacion.reduce((acc, j) => acc + j.puntuacion, 0)
-  return (suma / conPuntuacion.length).toFixed(1)
-})
-
-const totalHoras = computed(() => {
-  return juegos.value.reduce((acc, j) => acc + (j.duracion_horas || 0), 0).toFixed(1)
-})
 
 onMounted(() => {
-  cargarJuegos()
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  const rol = localStorage.getItem('rol') || sessionStorage.getItem('rol')
+  if (token) {
+    logueado.value = true
+    esAdmin.value = rol === 'admin'
+  }
 })
 </script>
 
 <style>
-:root {
-  --fondo-principal: #111827;
-  --fondo-tarjeta: #1E293B;
-  --azul-principal: #38BDF8;
-  --texto-principal: #F8FAFC;
-  --texto-secundario: #94A3B8;
-  --borde: #334155;
-  --rojo: #F87171;
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+:root { --fondo-principal: #0f172a; --fondo-tarjeta: rgba(30, 41, 59, 0.7); --azul-principal: #38BDF8; --texto-principal: #F8FAFC; --texto-secundario: #94A3B8; --borde: rgba(51, 65, 85, 0.5); --rojo: #F87171; --verde: #4ADE80; --amarillo: #FBBF24; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+.fondo-animado { min-height: 100vh; background: linear-gradient(-45deg, #0f172a, #1e1b4b, #0f172a, #1e293b); background-size: 400% 400%; animation: gradientBG 15s ease infinite; color: var(--texto-principal); }
+@keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.layout { display: flex; }
+.main-content { flex: 1; padding: 2rem; transition: margin-left 0.3s; }
+.con-sidebar { margin-left: 260px; }
+.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; padding: 1rem;}
+.glass-panel { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); border-radius: 16px; padding: 2rem; width: 100%; max-width: 420px; text-align: center; animation: slideUp 0.6s ease-out; }
+@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.logo-login { color: var(--azul-principal); font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 0 15px rgba(56, 189, 248, 0.5); }
+.login-box h2 { font-size: 1.2rem; color: var(--texto-secundario); margin-bottom: 2rem; font-weight: 400; }
+.login-box form { display: flex; flex-direction: column; gap: 1.2rem; }
+.input-group { display: flex; flex-direction: column; text-align: left; gap: 0.5rem; }
+.input-group label { font-size: 0.85rem; color: var(--texto-secundario); font-weight: 600; }
+
+/* Arregla el fondo del input de email y contraseña */
+.input-group > input, .password-wrapper input { 
+  padding: 0.8rem; border-radius: 8px; border: 1px solid var(--borde); 
+  background: rgba(15, 23, 42, 0.6) !important; color: white !important; 
+  outline: none; transition: 0.3s; width: 100%; 
+}
+.input-group > input:focus, .password-wrapper input:focus { 
+  border-color: var(--azul-principal) !important; 
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); 
 }
 
-body {
-  margin: 0;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background-color: var(--fondo-principal);
-  color: var(--texto-principal);
-}
+.password-wrapper { position: relative; display: flex; align-items: center; }
+.password-wrapper i { position: absolute; right: 10px; color: var(--texto-secundario); cursor: pointer; transition: 0.2s; }
+.password-wrapper i:hover { color: var(--azul-principal); }
 
-.app-container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
-header { text-align: center; margin-bottom: 3rem; }
-header h1 { font-size: 3rem; color: var(--azul-principal); margin-bottom: 0.5rem; }
-header p { color: var(--texto-secundario); }
-
-.form-section {
-  background: var(--fondo-tarjeta); padding: 1.5rem;
-  border-radius: 8px; border: 1px solid var(--borde); margin-bottom: 3rem;
-}
-form { display: flex; gap: 1rem; flex-wrap: wrap; }
-input, select, button {
-  padding: 0.75rem; border-radius: 4px; border: 1px solid var(--borde);
-  background: var(--fondo-principal); color: white; font-size: 1rem;
-}
-button {
-  background: var(--azul-principal); color: black; font-weight: bold;
-  cursor: pointer; border: none; transition: opacity 0.2s;
-}
-button:hover { opacity: 0.8; }
-.btn-cancelar { background: var(--texto-secundario); color: white; }
-
-.header-biblioteca {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
-}
-.buscador { width: 300px; }
-
-.reporte-metricas { display: flex; gap: 1rem; margin-bottom: 2rem; }
-.metrica {
-  flex: 1; background: var(--fondo-tarjeta); padding: 1rem;
-  border-radius: 8px; border: 1px solid var(--borde);
-  display: flex; flex-direction: column; align-items: center;
-}
-.metrica-titulo { color: var(--texto-secundario); font-size: 0.9rem; margin-bottom: 0.5rem; }
-.metrica-valor { font-size: 1.5rem; font-weight: bold; color: var(--azul-principal); }
-
-.grid-juegos { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
-.card-juego {
-  background: var(--fondo-tarjeta); padding: 1.5rem; border-radius: 8px;
-  border: 1px solid var(--borde); box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-  display: flex; flex-direction: column;
-}
-.card-juego h3 { margin-top: 0; color: var(--azul-principal); }
-.card-info { display: flex; justify-content: space-between; color: var(--texto-secundario); font-weight: bold; margin-bottom: 1rem; }
-.notas { color: var(--texto-secundario); font-size: 0.9rem; font-style: italic; flex-grow: 1; }
-
-.card-acciones { display: flex; gap: 0.5rem; margin-top: 1rem; }
-.btn-editar-card { background: var(--azul-principal); flex: 1; padding: 0.5rem; font-size: 0.9rem; }
-.btn-borrar { background: var(--rojo); flex: 1; padding: 0.5rem; font-size: 0.9rem; color: white; }
-.vacio { text-align: center; color: var(--texto-secundario); font-size: 1.2rem; padding: 3rem; }
+.checkbox-group { display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; font-size: 0.85rem; color: var(--texto-secundario); }
+.checkbox-group input { width: auto; }
+.btn-primary { padding: 0.8rem; border-radius: 8px; border: none; background: var(--azul-principal); color: #000; font-weight: 800; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4); }
+.toggle-auth { color: var(--azul-principal); cursor: pointer; margin-top: 1.5rem; font-size: 0.9rem; transition: 0.3s; }
+.toggle-auth:hover { color: white; }
+@media (max-width: 768px) { .con-sidebar { margin-left: 0; padding-bottom: 80px; } }
 </style>
